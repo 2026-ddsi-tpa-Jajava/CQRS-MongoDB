@@ -6,8 +6,8 @@ cuatro módulos del sistema.
 
 ## Ejecutar localmente
 
-Requisitos: Java 21, Maven y MongoDB. RabbitMQ es opcional; se utiliza para
-consumir eventos desde `donaciones.queue`.
+Requisitos: Java 21, Maven y MongoDB. RabbitMQ es opcional en desarrollo; se
+utiliza para consumir eventos desde `cqrs.events.queue`.
 
 ```powershell
 ./mvnw.cmd spring-boot:run
@@ -52,3 +52,14 @@ Los eventos deben tener la forma:
 
 `id` es obligatorio e idempotente. `version` o `ocurridoEn` se usan para
 ignorar eventos repetidos o más viejos que el estado ya proyectado.
+
+La cola `donaciones.queue` pertenece al flujo de workers de Logística y no debe
+compartirse con el modelo de lectura. Los cuatro módulos deben publicar eventos
+de integración en la cola durable `cqrs.events.queue`.
+
+Para activar el consumidor RabbitMQ:
+
+```powershell
+$env:RABBITMQ_ENABLED = "true"
+./mvnw.cmd spring-boot:run
+```
