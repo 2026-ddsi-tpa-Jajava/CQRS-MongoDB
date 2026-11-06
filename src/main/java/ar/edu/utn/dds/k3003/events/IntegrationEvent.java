@@ -9,7 +9,7 @@ import java.time.Instant;
 public record IntegrationEvent(
         @NotBlank String id,
         @NotBlank String tipo,
-        Long version,
-        Instant ocurridoEn,
+        @NotNull Long version,
+        @NotNull Instant ocurridoEn,
         @NotNull JsonNode payload) {
 }

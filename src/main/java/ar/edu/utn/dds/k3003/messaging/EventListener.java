@@ -33,10 +33,16 @@ public class EventListener {
         if (type == null) {
             throw new IllegalArgumentException("El evento de RabbitMQ no contiene tipo");
         }
-        Long version = node.has("version") ? node.get("version").asLong() : 0L;
-        Instant occurredAt = node.has("ocurridoEn")
-                ? objectMapper.convertValue(node.get("ocurridoEn"), Instant.class)
-                : Instant.now();
+        JsonNode versionNode = node.get("version");
+        if (versionNode == null || !versionNode.isIntegralNumber()) {
+            throw new IllegalArgumentException("El evento de RabbitMQ no contiene una version valida");
+        }
+        Long version = versionNode.longValue();
+        JsonNode occurredAtNode = node.get("ocurridoEn");
+        if (occurredAtNode == null || !occurredAtNode.isTextual()) {
+            throw new IllegalArgumentException("El evento de RabbitMQ no contiene ocurridoEn valido");
+        }
+        Instant occurredAt = objectMapper.convertValue(occurredAtNode, Instant.class);
         JsonNode payload = node.get("payload");
         if (payload == null || payload.isNull()) {
             throw new IllegalArgumentException("El evento de RabbitMQ no contiene payload");

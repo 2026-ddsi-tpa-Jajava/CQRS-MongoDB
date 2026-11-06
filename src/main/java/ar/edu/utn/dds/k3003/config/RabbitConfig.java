@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class RabbitConfig {
-    public static final String READ_MODEL_QUEUE = "cqrs.events.queue";
+    public static final String READ_MODEL_QUEUE = "consultas.queue";
 
     @Bean
     Queue readModelQueue() {

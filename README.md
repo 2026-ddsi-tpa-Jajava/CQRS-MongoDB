@@ -7,10 +7,10 @@ cuatro módulos del sistema.
 ## Ejecutar localmente
 
 Requisitos: Java 21, Maven y MongoDB. RabbitMQ es opcional en desarrollo; se
-utiliza para consumir eventos desde `cqrs.events.queue`.
+utiliza para consumir eventos desde `consultas.queue`.
 
 ```powershell
-./mvnw.cmd spring-boot:run
+mvn spring-boot:run
 ```
 
 Variables principales:
@@ -50,16 +50,36 @@ Los eventos deben tener la forma:
 }
 ```
 
-`id` es obligatorio e idempotente. `version` o `ocurridoEn` se usan para
+Todos los campos del envelope (`id`, `tipo`, `version`, `ocurridoEn` y
+`payload`) son obligatorios. `id` es la clave de idempotencia; `version` y
+`ocurridoEn` se usan para
 ignorar eventos repetidos o más viejos que el estado ya proyectado.
 
 La cola `donaciones.queue` pertenece al flujo de workers de Logística y no debe
-compartirse con el modelo de lectura. Los cuatro módulos deben publicar eventos
-de integración en la cola durable `cqrs.events.queue`.
+compartirse con el modelo de lectura. Según la configuración compartida por el
+equipo, los eventos que consume este servicio llegan a la cola durable
+`consultas.queue`.
 
 Para activar el consumidor RabbitMQ:
 
 ```powershell
 $env:RABBITMQ_ENABLED = "true"
-./mvnw.cmd spring-boot:run
+mvn spring-boot:run
 ```
+
+## Puesta a punto para la demo
+
+1. Configurar `MONGODB_URI` con la base central de lectura y verificar la
+   conexión.
+2. Configurar las variables `RABBITMQ_*`. La cola durable
+   `consultas.queue` se declara al iniciar el servicio.
+3. Levantar este servicio con `RABBITMQ_ENABLED=true` antes de ejecutar
+   comandos en los cuatro módulos.
+4. Confirmar `GET /actuator/health` y ejecutar las consultas únicamente contra
+   este servicio.
+
+El modelo de lectura usa una colección por agregado (`donadores`,
+`necesidades`, `depositos`, `donaciones`, `asignaciones`, `productos`,
+`entidades`, `insignias` y `misiones`) y `processed_events` para la
+idempotencia. `GET /consultas/calidad` usa una agregación de MongoDB sobre
+`donaciones`; las demás consultas combinan únicamente esas colecciones.
