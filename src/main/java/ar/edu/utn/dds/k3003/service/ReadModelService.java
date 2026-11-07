@@ -6,6 +6,8 @@ import ar.edu.utn.dds.k3003.model.ReadDocument;
 import ar.edu.utn.dds.k3003.repositories.ProcessedEventRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -20,6 +22,8 @@ import java.util.Set;
 
 @Service
 public class ReadModelService {
+    private static final Logger log = LoggerFactory.getLogger(ReadModelService.class);
+
     private static final Set<String> DONOR_TYPES = Set.of("DONADOR_REGISTRADO", "DONADOR_ACTUALIZADO");
     private static final Set<String> NEED_TYPES = Set.of("NECESIDAD_REGISTRADA", "NECESIDAD_ACTUALIZADA", "NECESIDAD_SATISFECHA");
     private static final Set<String> WAREHOUSE_TYPES = Set.of("DEPOSITO_REGISTRADO", "DEPOSITO_ACTUALIZADO");
@@ -45,6 +49,7 @@ public class ReadModelService {
         long version = event.version() == null ? 0L : event.version();
         Instant occurredAt = event.ocurridoEn() == null ? Instant.now() : event.ocurridoEn();
         if (processedEvents.existsById(event.id())) {
+            log.info("Evento id={} tipo={} ignorado: ya fue procesado", event.id(), event.tipo());
             return;
         }
 
@@ -60,12 +65,24 @@ public class ReadModelService {
                 fields.putAll(payload);
                 fields.put("ultimaActualizacion", occurredAt);
                 mongoTemplate.save(new ReadDocument(aggregateId, version, occurredAt, fields), collection);
+                log.info("Evento id={} tipo={} aplicado: {} {}/{} (version={}, ocurridoEn={})",
+                        event.id(), event.tipo(), current == null ? "creado" : "actualizado",
+                        collection, aggregateId, version, occurredAt);
+            } else {
+                log.info("Evento id={} tipo={} ignorado: {}/{} ya tiene un estado igual o mas nuevo "
+                                + "(evento version={} ocurridoEn={}; actual version={} actualizado={})",
+                        event.id(), event.tipo(), collection, aggregateId, version, occurredAt,
+                        current.getVersion(), current.getUpdatedAt());
             }
+        } else {
+            log.warn("Evento id={} tipo={} sin coleccion asociada: no modifica el modelo de lectura",
+                    event.id(), event.tipo());
         }
         try {
             processedEvents.save(new ProcessedEvent(event.id(), event.tipo(), version, occurredAt, Instant.now()));
         } catch (DuplicateKeyException ignored) {
             // A concurrent delivery of the same event has already been applied.
+            log.info("Evento id={} ya registrado como procesado por otra entrega", event.id());
         }
     }
 

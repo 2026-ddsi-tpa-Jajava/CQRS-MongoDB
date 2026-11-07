@@ -2,6 +2,8 @@ package ar.edu.utn.dds.k3003.controller;
 
 import ar.edu.utn.dds.k3003.model.ReadDocument;
 import org.bson.Document;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.ConditionalOperators;
@@ -24,6 +26,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/consultas")
 public class QueryController {
+    private static final Logger log = LoggerFactory.getLogger(QueryController.class);
+
     private final MongoTemplate mongoTemplate;
 
     public QueryController(MongoTemplate mongoTemplate) {
@@ -32,8 +36,10 @@ public class QueryController {
 
     @GetMapping("/donadores/{id}")
     public ResponseEntity<Map<String, Object>> donorCard(@PathVariable String id) {
+        log.info("GET /consultas/donadores/{}", id);
         ReadDocument donor = mongoTemplate.findById(id, ReadDocument.class, "donadores");
         if (donor == null) {
+            log.info("GET /consultas/donadores/{}: donador no encontrado", id);
             return ResponseEntity.notFound().build();
         }
         Map<String, Object> result = new LinkedHashMap<>(donor.getFields());
@@ -43,6 +49,7 @@ public class QueryController {
         result.put("insignias", documentsBy("insignias", "donadorID", id));
         result.put("misionEnCurso", documentsBy("misiones", "donadorID", id));
         result.put("entidadesBeneficiadas", benefitedEntities(id));
+        log.info("GET /consultas/donadores/{}: ficha armada", id);
         return ResponseEntity.ok(result);
     }
 
@@ -52,6 +59,8 @@ public class QueryController {
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) String categoria,
             @RequestParam(required = false) String subcategoriaId) {
+        log.info("GET /consultas/necesidades-urgentes urgenciaMinima={} tipo={} categoria={} subcategoriaId={}",
+                urgenciaMinima, tipo, categoria, subcategoriaId);
         Query query = Query.query(Criteria.where("fields.nivelDeUrgencia").gte(urgenciaMinima));
         if (tipo != null) {
             query.addCriteria(Criteria.where("fields.tipo").is(tipo));
@@ -73,6 +82,7 @@ public class QueryController {
         }
         result.sort((left, right) -> Integer.compare(
                 number(right.get("nivelDeUrgencia")), number(left.get("nivelDeUrgencia"))));
+        log.info("GET /consultas/necesidades-urgentes: {} necesidades", result.size());
         return result;
     }
 
@@ -81,6 +91,7 @@ public class QueryController {
             @RequestParam(required = false) String id,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime desde,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime hasta) {
+        log.info("GET /consultas/depositos id={} desde={} hasta={}", id, desde, hasta);
         List<ReadDocument> documents;
         if (id == null) {
             documents = mongoTemplate.findAll(ReadDocument.class, "depositos");
@@ -88,6 +99,7 @@ public class QueryController {
             ReadDocument document = mongoTemplate.findById(id, ReadDocument.class, "depositos");
             documents = document == null ? List.of() : List.of(document);
         }
+        log.info("GET /consultas/depositos: {} depositos", documents.size());
         return documents.stream().map(document -> {
             Map<String, Object> result = new LinkedHashMap<>(document.getFields());
             result.put("asignaciones", countAssignments(document.getId(), desde, hasta));
@@ -98,6 +110,7 @@ public class QueryController {
 
     @GetMapping("/calidad")
     public List<Document> donationQuality() {
+        log.info("GET /consultas/calidad");
         Aggregation aggregation = Aggregation.newAggregation(
                 Aggregation.project()
                         .and("fields.categoria").as("categoria")
@@ -111,7 +124,9 @@ public class QueryController {
                         .and("_id.categoria").as("categoria")
                         .and("_id.subcategoria").as("subcategoria")
                         .andExpression("donacionesConQueja / totalDonaciones").as("proporcionConQueja"));
-        return mongoTemplate.aggregate(aggregation, "donaciones", Document.class).getMappedResults();
+        List<Document> result = mongoTemplate.aggregate(aggregation, "donaciones", Document.class).getMappedResults();
+        log.info("GET /consultas/calidad: {} grupos categoria/subcategoria", result.size());
+        return result;
     }
 
     private List<Map<String, Object>> documentsBy(String collection, String key, String value) {
