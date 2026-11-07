@@ -27,10 +27,22 @@ Variables principales:
 ## API
 
 - `POST /eventos`: recibe un evento de integración y actualiza el modelo de lectura.
-- `GET /consultas/donadores/{id}`: ficha integral de un donador.
-- `GET /consultas/necesidades-urgentes?urgenciaMinima=1&tipo=EXTRAORDINARIA&categoria=ALIMENTOS&subcategoriaId=...`
-- `GET /consultas/depositos?desde=2026-01-01T00:00:00&hasta=2026-12-31T23:59:59`
-- `GET /consultas/calidad`
+- `GET /consultas/donadores/{id}`: ficha integral. Devuelve estado, `categoriaActual`,
+  `historialCategorias`, `insignias`, `misionEnCurso` (con `progresoActual`,
+  `progresoRequerido` y `porcentaje`), `donacionesPorEstado`, `quejas` (`total` y `detalle`)
+  y `entidadesBeneficiadas` (`entidadId`, `nombre` y `unidadesEntregadas`; solo asignaciones
+  `COMPLETADA`).
+- `GET /consultas/necesidades-urgentes?urgenciaMinima=1&tipo=EXTRAORDINARIA&categoria=ALIMENTOS&subcategoria=Granos&subcategoriaId=...`:
+  necesidades con faltante > 0, ordenadas por urgencia. Cada una trae la entidad (id y nombre),
+  el producto, `cantidadFaltante` (objetivo menos unidades entregadas),
+  `unidadesAsignadasPendientes` (asignadas y todavía no entregadas) y `stockPorDeposito`.
+- `GET /consultas/depositos?id=1&desde=2026-01-01T00:00:00&hasta=2026-12-31T23:59:59`:
+  `ocupacion` (unidades, capacidad, porcentaje), `algoritmoMatchmaking`,
+  `asignacionesPorEstado`, `entidadesAtendidas` y `tiempoPromedioIngresoAEntregaHoras`.
+  Las asignaciones se filtran por su fecha de creación y el tiempo promedio por la fecha de
+  entrega. `desde` y `hasta` se interpretan en UTC.
+- `GET /consultas/calidad?limiteDonadores=10`: objeto con `porCategoria` (total, con queja y
+  proporción por categoría/subcategoría) y `donadoresConMasQuejas` (con estado y categoría).
 - `DELETE /reset`: limpia el modelo de lectura (solo para desarrollo/demo).
 
 Los eventos deben tener la forma:
@@ -80,9 +92,10 @@ mvn spring-boot:run
 
 El modelo de lectura usa una colección por agregado (`donadores`,
 `necesidades`, `depositos`, `donaciones`, `asignaciones`, `productos`,
-`entidades`, `insignias` y `misiones`) y `processed_events` para la
-idempotencia. `GET /consultas/calidad` usa una agregación de MongoDB sobre
-`donaciones`; las demás consultas combinan únicamente esas colecciones.
+`entidades`, `insignias`, `misiones` y `quejas`) y `processed_events` para la
+idempotencia. Las consultas combinan únicamente esas colecciones. Los eventos de
+`DONADOR_*` se ordenan solo por `ocurridoEn`, porque Donadores e Incentivos los publican
+con numeraciones de `version` independientes.
 
 ## Logging centralizado
 

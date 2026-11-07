@@ -25,10 +25,11 @@ public class ReadModelService {
     private static final Logger log = LoggerFactory.getLogger(ReadModelService.class);
 
     private static final Set<String> DONOR_TYPES = Set.of("DONADOR_REGISTRADO", "DONADOR_ACTUALIZADO");
-    private static final Set<String> NEED_TYPES = Set.of("NECESIDAD_REGISTRADA", "NECESIDAD_ACTUALIZADA", "NECESIDAD_SATISFECHA");
+    private static final Set<String> NEED_TYPES = Set.of("NECESIDAD_REGISTRADA", "NECESIDAD_ACTUALIZADA", "NECESIDAD_SATISFECHA", "NECESIDAD_ELIMINADA");
     private static final Set<String> WAREHOUSE_TYPES = Set.of("DEPOSITO_REGISTRADO", "DEPOSITO_ACTUALIZADO");
     private static final Set<String> DONATION_TYPES = Set.of("DONACION_REGISTRADA", "DONACION_ACTUALIZADA", "DONACION_ESTADO_CAMBIADO");
     private static final Set<String> ASSIGNMENT_TYPES = Set.of("ASIGNACION_REGISTRADA", "ASIGNACION_ESTADO_CAMBIADO", "ENTREGA_REGISTRADA");
+    private static final Set<String> COMPLAINT_TYPES = Set.of("QUEJA_REGISTRADA", "QUEJA_ACTUALIZADA");
     private static final Set<String> PRODUCT_TYPES = Set.of("PRODUCTO_REGISTRADO", "PRODUCTO_ACTUALIZADO");
     private static final Set<String> ENTITY_TYPES = Set.of("ENTIDAD_REGISTRADA", "ENTIDAD_ACTUALIZADA");
     private static final Set<String> BADGE_TYPES = Set.of("INSIGNIA_ASIGNADA", "INSIGNIA_ACTUALIZADA");
@@ -60,9 +61,12 @@ public class ReadModelService {
         if (collection != null) {
             String aggregateId = aggregateId(payload, event.id());
             ReadDocument current = mongoTemplate.findById(aggregateId, ReadDocument.class, collection);
-            if (current == null || isNewer(version, occurredAt, current)) {
+            if (current == null || isNewer(collection, version, occurredAt, current)) {
                 Map<String, Object> fields = current == null ? new HashMap<>() : new HashMap<>(current.getFields());
                 fields.putAll(payload);
+                if ("NECESIDAD_ELIMINADA".equalsIgnoreCase(event.tipo())) {
+                    fields.put("eliminada", true);
+                }
                 fields.put("ultimaActualizacion", occurredAt);
                 mongoTemplate.save(new ReadDocument(aggregateId, version, occurredAt, fields), collection);
                 log.info("Evento id={} tipo={} aplicado: {} {}/{} (version={}, ocurridoEn={})",
@@ -88,12 +92,17 @@ public class ReadModelService {
 
     public void reset() {
         for (String collection : Set.of("donadores", "necesidades", "depositos", "donaciones",
-                "asignaciones", "productos", "entidades", "insignias", "misiones", "processed_events")) {
+                "asignaciones", "productos", "entidades", "insignias", "misiones", "quejas", "processed_events")) {
             mongoTemplate.dropCollection(collection);
         }
     }
 
-    private boolean isNewer(long version, Instant occurredAt, ReadDocument current) {
+    private boolean isNewer(String collection, long version, Instant occurredAt, ReadDocument current) {
+        if ("donadores".equals(collection)) {
+            // Donadores e Incentivos publican sobre el mismo donador con numeraciones de version
+            // independientes: solo se puede ordenar por el instante en que ocurrio el evento.
+            return !occurredAt.isBefore(current.getUpdatedAt());
+        }
         return version > current.getVersion()
                 || version == current.getVersion() && occurredAt.isAfter(current.getUpdatedAt());
     }
@@ -115,6 +124,7 @@ public class ReadModelService {
         if (WAREHOUSE_TYPES.contains(normalized)) return "depositos";
         if (DONATION_TYPES.contains(normalized)) return "donaciones";
         if (ASSIGNMENT_TYPES.contains(normalized)) return "asignaciones";
+        if (COMPLAINT_TYPES.contains(normalized)) return "quejas";
         if (PRODUCT_TYPES.contains(normalized)) return "productos";
         if (ENTITY_TYPES.contains(normalized)) return "entidades";
         if (BADGE_TYPES.contains(normalized)) return "insignias";
