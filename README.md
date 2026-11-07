@@ -83,3 +83,19 @@ El modelo de lectura usa una colección por agregado (`donadores`,
 `entidades`, `insignias` y `misiones`) y `processed_events` para la
 idempotencia. `GET /consultas/calidad` usa una agregación de MongoDB sobre
 `donaciones`; las demás consultas combinan únicamente esas colecciones.
+
+## Logging centralizado
+
+El servicio puede enviar sus logs a Better Stack mediante Logtail. En Render
+configurá `BETTERSTACK_SOURCE_TOKEN` con el Source token de la fuente de CQRS.
+El token no debe commitearse ni incluirse en este repositorio.
+
+Variables opcionales:
+
+```text
+BETTERSTACK_SOURCE_TOKEN=...
+BETTERSTACK_INGEST_URL=https://in.logs.betterstack.com
+APP_NAME=donatrack-cqrs
+```
+
+Sin `BETTERSTACK_SOURCE_TOKEN`, los logs continúan saliendo por consola.

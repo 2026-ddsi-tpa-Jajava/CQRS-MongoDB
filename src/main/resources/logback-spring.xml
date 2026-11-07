@@ -1,0 +1,28 @@
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{ISO8601} [%thread] %-5level %logger{36} [trace=%X{traceId} request=%X{requestId}] - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <if condition='isDefined("BETTERSTACK_SOURCE_TOKEN")'>
+        <then>
+            <appender name="BETTERSTACK" class="com.logtail.logback.LogtailAppender">
+                <appName>${APP_NAME:-donatrack-cqrs}</appName>
+                <sourceToken>${BETTERSTACK_SOURCE_TOKEN}</sourceToken>
+                <ingestUrl>${BETTERSTACK_INGEST_URL:-https://in.logs.betterstack.com}</ingestUrl>
+                <mdcFields>traceId,requestId</mdcFields>
+                <mdcTypes>string,string</mdcTypes>
+            </appender>
+            <root level="INFO">
+                <appender-ref ref="CONSOLE"/>
+                <appender-ref ref="BETTERSTACK"/>
+            </root>
+        </then>
+        <else>
+            <root level="INFO">
+                <appender-ref ref="CONSOLE"/>
+            </root>
+        </else>
+    </if>
+</configuration>
